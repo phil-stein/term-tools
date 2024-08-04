@@ -8,6 +8,6 @@ __! only tested/works on windows__ <br>
 replacement for `dir` command <br>
 lists all files in directory / subdirectories <br>
 <br>
-<img src="https://github.com/phil-stein/term-tools/blob/main/files/ls_01.png" alt="logo" width="400">
+<img src="https://github.com/phil-stein/term-tools/blob/main/files/ls_02.PNG" alt="logo" width="400">
 
 

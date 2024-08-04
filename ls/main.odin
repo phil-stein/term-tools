@@ -50,7 +50,6 @@ main :: proc()
   // for i in 0 ..< len(os.args)
   // { fmt.println( "os.args[", i, "]: ", os.args[i] ) }
 
-  
   // specified directory 
   if len(os.args) > 1 
   { 
@@ -127,7 +126,7 @@ search_directory_recursive :: proc( name: string )
     {
       tmp_dir_icon := FILE_ICON
       FILE_ICON = "..."
-      print_file_name( fi, true, "" )
+      print_file_name( fi, true, true, true, "..." )
       FILE_ICON = tmp_dir_icon
 
       break
@@ -150,47 +149,83 @@ search_directory_recursive :: proc( name: string )
       tmp_dir_icon := DIR_ICON
       DIR_ICON = "..."
       offset += 2
-      print_file_name( fi, true, "" )
+      print_file_name( fi, true, true, true, "..." )
       offset -= 2
       DIR_ICON = tmp_dir_icon
     }
   }
 }
 
-print_file_name :: proc( fi: os.File_Info, name_override: bool = false, new_name: string = "" )
+print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: bool = false, name_override: bool = false, new_name: string = "" )
 {
+  char_count := 0
+
+
   if offset < 2
   {
-    if fi.is_dir { fmt.print( DIR_ENTER, DIR_ICON) }
-    else         { fmt.print( LINE_ACT, FILE_ICON) }
+    if !hide_icon
+    {
+      if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+      else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
+    }
+    else
+    {
+      if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+      else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
+    }
   }
-  else           { fmt.print( LINE_INACT ) }
+  else           { fmt.printf( LINE_INACT ); char_count += 1 }
 
   start := offset < 2 ? 0 : offset -1
   for i in 0 ..< offset
   {
     if i == start
     { 
-      if fi.is_dir { fmt.print( DIR_ENTER, DIR_ICON ) }
-      else         { fmt.print( LINE_ACT, FILE_ICON ) }
+      // if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, hide_icon ? "" : DIR_ICON ); char_count += 3 }
+      // else         { fmt.printf( "%s %s",  LINE_ACT,  hide_icon ? "" : FILE_ICON ); char_count += 3 }
+      if !hide_icon
+      {
+        if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+        else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
+      }
+      else
+      {
+        if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+        else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
+      }
     }
     else if i > start 
-    { fmt.print( " " ) }
+    { fmt.printf( "X" ); char_count += 1 }
     else 
     { 
-      if  (i +1) % 2 == 0 { fmt.print( LINE_INACT ) }
-      else           { fmt.print( " " ) }
+      if  (i +1) % 2 == 0 { fmt.printf( LINE_INACT ); char_count += 1 }
+      else                { fmt.printf( " " );        char_count += 1 }
     }
   }
 
-  if name_override { fmt.print( new_name ) }
+  if name_override { fmt.printf( new_name ); char_count += len(new_name) }
   else             
   { 
-    fmt.print( fi.name ) 
-    if fi.is_dir { fmt.print( "\\" ) }
+    fmt.printf( fi.name ); char_count += len(fi.name)
+    if fi.is_dir { fmt.printf( "\\" ); char_count += 1 }
   }
 
-  // fmt.print( " | ", fi.size ) 
+  // fmt.printf( " % *d", 30 - char_count, fi.size ) 
+  
+
+  if !fi.is_dir && !hide_size
+  {
+    fmt.printf( "  " ); char_count += 2
+    fmt.printf("\033[%d;%d;%dm", 2, 30, 40) // mode, fg, bg
+    for i in 0 ..< 30 - char_count
+    {
+      fmt.printf( "." )
+    }
+    fmt.printf("\033[%d;%d;%dm", 0, 37, 40) // mode, fg, bg
+
+    fmt.printf( "%dmb, %dkb, %db", fi.size / 1000000, fi.size / 1000, fi.size ) 
+
+  }
 
   fmt.print( "\n" )
 
