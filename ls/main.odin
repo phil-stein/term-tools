@@ -16,7 +16,7 @@ SUBDIR_DEPTH_MAX :: 3
 
 FILES_MAX :: 8 // @TODO:
 
-
+MAX_LINE_WIDTH :: 50
 
 // ─│─│╭╮╯╰           -> rounded window corners
 // ─│─│┌┐┘└           -> window corners
@@ -25,7 +25,7 @@ FILES_MAX :: 8 // @TODO:
 // LINE_INACT :: "┊" 
 // LINE_INACT :: "╏"
 LINE_INACT :: "╎"
-LINE_ACT   :: "│"
+LINE_ACT   := "│"
 
 // DIR_ENTER  :: "╰"
 // DIR_ENTER  :: "├"
@@ -117,21 +117,31 @@ search_directory_recursive :: proc( name: string )
 
   file_count := 0
 
-  for fi in fis 
+  for fi, i in fis 
   {
     total_files += 1
     file_count += 1
 
     if file_count > FILES_MAX
     {
+      tmp := LINE_ACT
+      LINE_ACT = "└"
       tmp_dir_icon := FILE_ICON
       FILE_ICON = "..."
       print_file_name( fi, true, true, true, "..." )
       FILE_ICON = tmp_dir_icon
+      LINE_ACT = tmp
 
       break
     }
-    print_file_name( fi )
+    if i == len(fis) -1
+    {
+      tmp := LINE_ACT
+      LINE_ACT = "└"
+      print_file_name( fi )
+      LINE_ACT = tmp
+    }
+    else { print_file_name( fi ) }
 
     if fi.is_dir && subdir_depth < SUBDIR_DEPTH_MAX 
     {
@@ -146,12 +156,15 @@ search_directory_recursive :: proc( name: string )
     }
     else if fi.is_dir && subdir_depth >= SUBDIR_DEPTH_MAX 
     {
+      tmp := LINE_ACT
+      LINE_ACT = "└"
       tmp_dir_icon := DIR_ICON
       DIR_ICON = "..."
       offset += 2
       print_file_name( fi, true, true, true, "..." )
       offset -= 2
       DIR_ICON = tmp_dir_icon
+      LINE_ACT = tmp
     }
   }
 }
@@ -203,27 +216,51 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     }
   }
 
+  max_chars := MAX_LINE_WIDTH - char_count
+  assert( max_chars >= 0 )
+
   if name_override { fmt.printf( new_name ); char_count += len(new_name) }
   else             
   { 
-    fmt.printf( fi.name ); char_count += len(fi.name)
+    if len(fi.name) >= max_chars
+    {
+      n := str.cut( fi.name, 0, max_chars -3 )
+      fmt.printf( "%s...", n ); char_count += max_chars
+    }
+    else { fmt.printf( fi.name ); char_count += len(fi.name) }
+
     if fi.is_dir { fmt.printf( "\\" ); char_count += 1 }
   }
 
   // fmt.printf( " % *d", 30 - char_count, fi.size ) 
   
+  max_chars = MAX_LINE_WIDTH - char_count
+  assert( max_chars >= 0 )
 
   if !fi.is_dir && !hide_size
   {
-    fmt.printf( "  " ); char_count += 2
+    // if      max_chars >= 3 { fmt.printf( "  " ); char_count += 2 }
+    // else                   { fmt.printf( "XX" ); char_count += 1 }
+    fmt.printf( "  " ); char_count += 2 
+
     fmt.printf("\033[%d;%d;%dm", 2, 30, 40) // mode, fg, bg
-    for i in 0 ..< 30 - char_count
+    for i in 0 ..< max_chars
     {
       fmt.printf( "." )
     }
+    // fmt.printf( "%2d", max_chars )
     fmt.printf("\033[%d;%d;%dm", 0, 37, 40) // mode, fg, bg
 
-    fmt.printf( "%dmb, %dkb, %db", fi.size / 1000000, fi.size / 1000, fi.size ) 
+    // fmt.printf( "%dmb, % 4dkb, % 4db", fi.size / 1000000, fi.size / 1000, fi.size ) 
+
+    if fi.size > 1000000000
+    { fmt.printf( "%.2f gb", f32(fi.size) / 1000000000 ) }
+    else if fi.size > 1000000
+    { fmt.printf( "%.2f mb", f32(fi.size) / 1000000 ) }
+    else if fi.size > 1000
+    { fmt.printf( "%.2f kb", f32(fi.size) / 1000 ) }
+    else
+    { fmt.printf( "%d b",  fi.size) }
 
   }
 
