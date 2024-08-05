@@ -9,6 +9,6 @@ __! requires utf-8 terminal, not the pre-installed command prompt on windows__ <
 replacement for `dir` command <br>
 lists all files in directory / subdirectories <br>
 <br>
-<img src="https://github.com/phil-stein/term-tools/blob/main/files/ls_03.PNG" alt="logo" width="200">
+<img src="https://github.com/phil-stein/term-tools/blob/main/files/ls_03.PNG" alt="logo" width="300">
 
 
