@@ -3,6 +3,7 @@ package ls
 import     "core:fmt"
 import     "core:os"
 import str "core:strings"
+import     "core:strconv"
 import     "core:c/libc"
 import     "core:log"
 import win "core:sys/windows"
@@ -11,12 +12,14 @@ import win "core:sys/windows"
 total_files  : i32 = 0
 total_dirs   : i32 = 0
 offset       : i32 = 0
-subdir_depth : i32 = 0
-SUBDIR_DEPTH_MAX :: 3
+subdir_depth : i32 = 1
+SUBDIR_DEPTH_MAX := 3 
 
-FILES_MAX :: 8 // @TODO:
+FILES_MAX := 1 << 32  // max files shown in subdirs
 
-MAX_LINE_WIDTH :: 50
+MAX_LINE_WIDTH := 50  // with of line without the size
+
+ONLY_SHOW_DIRS := false 
 
 // ─│─│╭╮╯╰           -> rounded window corners
 // ─│─│┌┐┘└           -> window corners
@@ -36,6 +39,8 @@ DIR_ENTER  :: "└"
 DIR_ICON  := ""
 FILE_ICON := "󰈙"
 
+CONFIG_ICON :: ""
+
 main :: proc()
 {
   context.logger = log.create_console_logger()
@@ -50,10 +55,96 @@ main :: proc()
   // for i in 0 ..< len(os.args)
   // { fmt.println( "os.args[", i, "]: ", os.args[i] ) }
 
+  has_path_arg := false
+  path_arg     := -1
+
+  // check for args
+  //    -w:XX -> set max line width
+  //    -d:XX -> set sub dir depth
+  //    -f:XX -> set max files shown in subdirs, <=0 means no cap
+  //    -dir  -> only show dirs 
+  for arg, i in os.args[1:]
+  {
+    // fmt.println( "arg[", i, "]: ", arg )
+    if arg[0] == '-'
+    {
+      // -w:XX
+      if arg[1] == 'w' && arg[2] == ':' && len(arg) >= 4
+      {
+        numstr  := arg[3:]
+        num, ok := strconv.parse_int( numstr )
+
+        if !ok
+        { fmt.println( "> SET WIDTH: ", numstr, ", failed" ) }
+        else 
+        {
+          if num < 24
+          { 
+            fmt.println( "! -w:", numstr, " min width is 24" ) 
+            num = 24
+          }
+          MAX_LINE_WIDTH = num
+          // fmt.println( "> SET WIDTH: ", numstr, ", MAX_LINE_WIDTH: ", MAX_LINE_WIDTH )
+        }
+      }
+      else if arg[1] == 'd' && arg[2] == ':' && len(arg) >= 4 // -d:XX
+      {
+        numstr  := arg[3:]
+        num, ok := strconv.parse_int( numstr )
+
+        if !ok
+        { fmt.println( "> SET DEPTH: ", numstr, ", failed" ) }
+        else 
+        {
+          if num < 0
+          { 
+            fmt.println( "! -d:", numstr, " min subdirectory depth is 0" ) 
+            num = 0
+          }
+          SUBDIR_DEPTH_MAX = num
+          // fmt.println( "> SET DEPTH: ", numstr, ", : SUBDIR_DEPTH_MAX", SUBDIR_DEPTH_MAX)
+        }
+      } 
+      else if arg[1] == 'f' && arg[2] == ':' && len(arg) >= 4 // -f:XX
+      {
+        numstr  := arg[3:]
+        num, ok := strconv.parse_int( numstr )
+
+        if !ok
+        { fmt.println( "> SET MAX FILES: ", numstr, ", failed" ) }
+        else 
+        {
+          if num < 1
+          { 
+            // fmt.println( "! -f:", numstr, " <= 0 means all files are shown" ) 
+            num = 1 << 32
+          }
+          FILES_MAX = num
+          // fmt.println( "> SET MAX FILES: ", numstr, ", FILES_MAX: ", FILES_MAX )
+        }
+      }
+      else if arg[1] == 'd' && arg[2] == 'i' && arg[3] == 'r' // -dir
+      {
+        ONLY_SHOW_DIRS = true
+        // fmt.println( "> ONLY SHOW DIRS: true" )
+      }
+    }
+    else
+    {
+      has_path_arg = true
+      path_arg     = i +1
+    }
+  }
+
   // specified directory 
-  if len(os.args) > 1 
+  if has_path_arg && len(os.args) > 1 
   { 
-    log.error( "cant do arguments yet" )
+    
+    // path := os.get_current_directory()
+    path := str.concatenate( { os.get_current_directory(), "\\", os.args[path_arg] } )
+    // fmt.println( "path: ", path )
+    search_directory( path )
+    
   }
   else // current directory
   {
@@ -86,7 +177,17 @@ print_result :: proc ()
 search_directory :: proc( name: string )
 {
   // name_short := str.cut( name, 0, 3 )
-  fmt.println( "", name ) 
+  fmt.println( DIR_ICON, name ) 
+  fmt.print( LINE_ACT, CONFIG_ICON, " " ) 
+  fmt.print( "width: ", MAX_LINE_WIDTH, ", subdir depth: ", SUBDIR_DEPTH_MAX )
+  fmt.print( "\n" )
+  fmt.print( LINE_ACT, CONFIG_ICON, " " ) 
+  if FILES_MAX >= 1 << 31
+  { fmt.print( "max files: all" ) }
+  else 
+  { fmt.print( "max files: ", FILES_MAX ) }
+  fmt.print( ", dirs: ", ONLY_SHOW_DIRS )
+  fmt.print( "\n" )
   fmt.println( LINE_ACT ) 
 
   search_directory_recursive( name )
@@ -122,7 +223,7 @@ search_directory_recursive :: proc( name: string )
     total_files += 1
     file_count += 1
 
-    if file_count > FILES_MAX
+    if subdir_depth > 1 && file_count > FILES_MAX
     {
       tmp := LINE_ACT
       LINE_ACT = "└"
@@ -143,7 +244,7 @@ search_directory_recursive :: proc( name: string )
     }
     else { print_file_name( fi ) }
 
-    if fi.is_dir && subdir_depth < SUBDIR_DEPTH_MAX 
+    if fi.is_dir && subdir_depth < i32(SUBDIR_DEPTH_MAX)
     {
       total_files -= 1
       total_dirs  += 1
@@ -154,7 +255,7 @@ search_directory_recursive :: proc( name: string )
       subdir_depth -= 1
       offset -= 2
     }
-    else if fi.is_dir && subdir_depth >= SUBDIR_DEPTH_MAX 
+    else if !ONLY_SHOW_DIRS && fi.is_dir && subdir_depth >= i32(SUBDIR_DEPTH_MAX)
     {
       tmp := LINE_ACT
       LINE_ACT = "└"
@@ -171,6 +272,8 @@ search_directory_recursive :: proc( name: string )
 
 print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: bool = false, name_override: bool = false, new_name: string = "" )
 {
+  if ONLY_SHOW_DIRS && !fi.is_dir { return }
+
   char_count := 0
 
 
