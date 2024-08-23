@@ -14,6 +14,8 @@ lists all files in directory / subdirectories <br>
   -d:XX -> set sub dir depth, min is 0
   -f:XX -> set max files shown in subdirs, <=0 means no cap
   -dir  -> only show dirs
+  -p:X  -> set preset
+  -X    -> set preset
   
   example:
   > ls
@@ -23,10 +25,44 @@ lists all files in directory / subdirectories <br>
   > ls path/to/dir -w:30 -d:2 -f:0
   > ls path\to\dir -w:30 -d:2 -f:0
   > ls -dir -d:100
+  > ls -p:0
+  > ls -0
 ```
 <br>
 <img src="https://github.com/phil-stein/term-tools/blob/main/files/ls_04.PNG" alt="logo" width="300">
 <br>
+
+### config-file
+set the default values and presets for setting multiple values <br>
+at once uding -p:X or -X commands <br>
+presets go up to [preset:9] <br>
+```
+[width] 40
+[depth] 0
+[files] 1
+[dirs]  true
+
+// preset
+
+[preset:0] {
+  [width] 40
+  [depth] 1
+  [files] 0
+  [dirs]  false
+}
+[preset:1] {
+  [width] 40
+  [depth] 2
+  [files] 0
+  [dirs]  false
+}
+[preset:2] {
+  [width] 40
+  [depth] 3
+  [files] 0
+  [dirs]  false
+}
+```
 
 __todo__
   - [ ] ! names sometimes immediately after icon
