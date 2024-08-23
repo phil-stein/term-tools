@@ -29,8 +29,10 @@ lists all files in directory / subdirectories <br>
 <br>
 
 __todo__
+  - [ ] ! names sometimes immediately after icon
   - [ ] appropriate file icons 
   - [ ] config file for default settigs ?
+  - [ ] use color ?
 
 
 ## todo
@@ -38,3 +40,6 @@ __todo__
   - [ ] copy / xcopy
   - [ ] rename
   - [ ] delete
+  - [ ] git wrapper ?
+    - > xyz "<message>"
+    - -> git add & commit -m "USER: <message>" & push 

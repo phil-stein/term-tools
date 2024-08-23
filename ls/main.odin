@@ -7,13 +7,15 @@ import     "core:strconv"
 import     "core:c/libc"
 import     "core:log"
 import win "core:sys/windows"
+import c   "core:c"
+import     "core:mem"
 
 
 total_files  : i32 = 0
 total_dirs   : i32 = 0
 offset       : i32 = 0
 subdir_depth : i32 = 1
-SUBDIR_DEPTH_MAX := 3 
+SUBDIR_DEPTH_MAX := 2 
 
 FILES_MAX := 1 << 32  // max files shown in subdirs
 
@@ -41,6 +43,11 @@ FILE_ICON := "󰈙"
 
 CONFIG_ICON :: ""
 
+
+path_to_exec : string
+
+active_preset := -1 // <0 means config_result.main
+
 main :: proc()
 {
   context.logger = log.create_console_logger()
@@ -48,21 +55,45 @@ main :: proc()
   // @NOTE: enable utf output to console, windows specific
   win.SetConsoleOutputCP( win.CP_UTF8 )
 
-  // os.args is a []string
-  // fmt.println( "os.args[0]: ", os.args[0] )  // executable name
-  // fmt.println( os.args[1:] ) // the rest of the arguments
-  // fmt.println( "len(os.args): ", len(os.args) ) // the rest of the arguments
-  // for i in 0 ..< len(os.args)
-  // { fmt.println( "os.args[", i, "]: ", os.args[i] ) }
+  // fmt.println( "current_dir:", os.get_current_directory() )
+  // path to executable
+  buf : [256]c.wchar_t
+  path_to_exec_len := win.GetModuleFileNameW( nil, &buf[0], 256 )
+  if path_to_exec_len <= 0 { fmt.eprintln( "win.GetModuleFileNameW() failed:", path_to_exec_len ) }
+  sb := str.builder_make()
+  for i in 0 ..< path_to_exec_len -7 // -7 to remove '\ls.exe'
+  { str.write_byte( &sb, u8(buf[i]) ) }
+  path_to_exec = str.to_string( sb )
+  // fmt.println( "GetModuleFileName():", path_to_exec )
+ 
+  config_path := str.concatenate( []string{ path_to_exec, "\\..\\config\\ls.config" } )
+  // config_path_slice := [?]string{ path_to_exec, "\\..\\config\\ls.config" }
+  // config_path, err := str.concatenate( config_path_slice[:] )
+  // if err != mem.Allocator_Error.None { fmt.eprintln( "[ERROR] alloc err" ); os.exit( 2 ) }
+  // fmt.println( "config_path_slice:", config_path_slice, "len:", len(config_path_slice) )
+  // fmt.println( "config_path:", config_path )
+  // assert( config_path == "C:\\Workspace\\odin\\term-tools\\..\\config\\ls.config" )
+  config_read( config_path )
+  // config_read( "../config/ls.config" )
+
+  // MAX_LINE_WIDTH   = config_result.main.width
+  // ONLY_SHOW_DIRS   = config_result.main.dirs  
+  // SUBDIR_DEPTH_MAX = config_result.main.depth 
+  // FILES_MAX        = config_result.main.files 
+  config_set_preset( &config_result.main )
+
+  // assert( false ) // @TMP:
 
   has_path_arg := false
   path_arg     := -1
 
   // check for args
+  //    -h    -> help
   //    -w:XX -> set max line width
   //    -d:XX -> set sub dir depth
   //    -f:XX -> set max files shown in subdirs, <=0 means no cap
   //    -dir  -> only show dirs 
+  //    -X    -> preset number X
   for arg, i in os.args[1:]
   {
     // fmt.println( "arg[", i, "]: ", arg )
@@ -114,7 +145,7 @@ main :: proc()
         { fmt.println( "> SET MAX FILES: ", numstr, ", failed" ) }
         else 
         {
-          if num < 1
+          if num < 1  // <1 means show all files
           { 
             // fmt.println( "! -f:", numstr, " <= 0 means all files are shown" ) 
             num = 1 << 32
@@ -123,10 +154,50 @@ main :: proc()
           // fmt.println( "> SET MAX FILES: ", numstr, ", FILES_MAX: ", FILES_MAX )
         }
       }
+      else if libc.isdigit( i32(arg[1]) ) > 0  // -X
+      {
+      // else if ( arg[1] == 'p' && arg[2] == ':' && len(arg) >= 4 ) ||  // -p:X
+      //         ( libc.isdigit( i32(arg[1]) ) > 0 )                     // -X
+        // numstr  := arg[2:]
+        // num, ok := strconv.parse_int( numstr )
+        num := int(arg[1]) - 48  // ascii code to 0-9 range
+
+        if !config_result.presets[num].available
+        { fmt.eprintln( "[ERROR] tried using preset that wasnt defined in ls.config" ); os.exit( 1 ) }
+        else
+        {
+          if num < 0 || num > 9   // || !ok
+          { fmt.println( "[ERROR] set preset: ", num, "|", rune(arg[1]), ", failed" ) }
+          else 
+          {
+            config_set_preset( &config_result.presets[num] )
+            active_preset = num
+            // fmt.println( "> SET PRESET: ", num, " | ", rune(arg[1]) )
+          }
+        }
+      }
       else if arg[1] == 'd' && arg[2] == 'i' && arg[3] == 'r' // -dir
       {
         ONLY_SHOW_DIRS = true
         // fmt.println( "> ONLY SHOW DIRS: true" )
+      }
+      else if arg[1] == 'h' || 
+              ( arg[1] == '-' && arg[2] == 'h' ) // -h or --h
+      {
+        fmt.println( "  > ls        -> current path" )
+        fmt.println( "  > ls <path> -> specified path" )
+        fmt.println( "  > ls -dir   -> only show directories" )
+        fmt.println( "  > ls -w:XX  -> specify width" )
+        fmt.println( "  > ls -d:XX  -> specify subdir depth" )
+        fmt.println( "  > ls -f:XX  -> specify max files shown" )
+        fmt.println( "  example:" )
+        fmt.println( "  > ls some/folder\\01 -dir -w:30 -d:4 -f:14" )
+        os.exit( 0 )
+      }
+      else 
+      {
+        fmt.printf( "[ERROR] unknow argument: \"%s\"\n", arg )
+        os.exit( 0 )
       }
     }
     else
@@ -153,24 +224,6 @@ main :: proc()
     // fmt.println( "cwd: ", cwd )
     search_directory( cwd )
   }
-
-}
-
-print_result :: proc ()
-{
-  // fmt.println(  " ----------------------" )
-  // if directory
-  // {
-  // fmt.printfln( "  total files:  % *d", 6, total_files )
-  // fmt.printfln( "  odin files:   % *d", 6, total_files )
-  // if failed_files > 0 { fmt.printfln( "  failed files: % *d", 6, failed_files ) }
-  // fmt.println(  " - - - - - - - - - - - " )
-  // }
-  // fmt.printfln( "  empty:        % *d", 6, empty_lines )
-  // fmt.printfln( "  comment:      % *d", 6, comment_lines )
-  // fmt.printfln( "  code:         % *d", 6, code_lines )
-  // fmt.printfln( "  total:        % *d", 6, total_lines )
-  // fmt.println(  " ----------------------" )
 }
 
 // calls the recursive function
@@ -188,6 +241,11 @@ search_directory :: proc( name: string )
   { fmt.print( "max files: ", FILES_MAX ) }
   fmt.print( ", dirs: ", ONLY_SHOW_DIRS )
   fmt.print( "\n" )
+  if active_preset >= 0 // when using a preset
+  {
+    fmt.print( LINE_ACT, CONFIG_ICON, " preset: ", active_preset ) 
+    fmt.print( "\n" )
+  }
   fmt.println( LINE_ACT ) 
 
   search_directory_recursive( name )
@@ -200,9 +258,9 @@ search_directory_recursive :: proc( name: string )
 
   if err != os.ERROR_NONE 
   {
-      // Print error to stderr and exit with errorcode
-      fmt.eprintln( "[ERROR] could not open directory for reading: ", name )
-      os.exit(1)
+    // Print error to stderr and exit with errorcode
+    fmt.eprintln( "[ERROR] could not open directory for reading: ", name )
+    os.exit(1)
   }
 
   fis: []os.File_Info
@@ -211,8 +269,8 @@ search_directory_recursive :: proc( name: string )
   fis, err = os.read_dir(f, -1) // -1 reads all file infos
   if err != os.ERROR_NONE 
   {
-      fmt.eprintln( "[ERROR] could not read directory: ", name )
-      os.exit(2)
+    fmt.eprintln( "[ERROR] could not read directory: ", name )
+    os.exit(2)
   }
 
 
