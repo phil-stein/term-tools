@@ -313,7 +313,8 @@ search_directory_recursive :: proc( name: string )
       subdir_depth -= 1
       offset -= 2
     }
-    else if !ONLY_SHOW_DIRS && fi.is_dir && subdir_depth >= i32(SUBDIR_DEPTH_MAX)
+    else if !ONLY_SHOW_DIRS && fi.is_dir && subdir_depth > 1 &&
+            subdir_depth >= i32(SUBDIR_DEPTH_MAX)
     {
       tmp := LINE_ACT
       LINE_ACT = "└"

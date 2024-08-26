@@ -69,6 +69,7 @@ __todo__
   - [ ] appropriate file icons 
   - [ ] config file for default settigs ?
   - [ ] use color ?
+  - [ ] add -conf / -config command to print path of config file and result
 
 
 ## todo
