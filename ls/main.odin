@@ -44,6 +44,10 @@ FILE_ICON := "󰈙"
 CONFIG_ICON :: ""
 
 
+PF_NORMAL :: 0
+PF_DIM    :: 2
+PF_WHITE  :: 37 
+
 path_to_exec : string
 
 active_preset := -1 // <0 means config_result.main
@@ -53,7 +57,7 @@ main :: proc()
   context.logger = log.create_console_logger()
 
   // @NOTE: enable utf output to console, windows specific
-  win.SetConsoleOutputCP( win.CP_UTF8 )
+  win.SetConsoleOutputCP( win.CODEPAGE(win.CP_UTF8) )
 
   // fmt.println( "current_dir:", os.get_current_directory() )
   // path to executable
@@ -184,19 +188,13 @@ main :: proc()
       else if arg[1] == 'h' || 
               ( arg[1] == '-' && arg[2] == 'h' ) // -h or --h
       {
-        fmt.println( "  > ls        -> current path" )
-        fmt.println( "  > ls <path> -> specified path" )
-        fmt.println( "  > ls -dir   -> only show directories" )
-        fmt.println( "  > ls -w:XX  -> specify width" )
-        fmt.println( "  > ls -d:XX  -> specify subdir depth" )
-        fmt.println( "  > ls -f:XX  -> specify max files shown" )
-        fmt.println( "  example:" )
-        fmt.println( "  > ls some/folder\\01 -dir -w:30 -d:4 -f:14" )
+        print_help()
         os.exit( 0 )
       }
       else 
       {
         fmt.printf( "[ERROR] unknow argument: \"%s\"\n", arg )
+        print_help()
         os.exit( 0 )
       }
     }
@@ -224,13 +222,28 @@ main :: proc()
     // fmt.println( "cwd: ", cwd )
     search_directory( cwd )
   }
+
+  // @NOTE: hacky reset shouldnt be needed, but just in case
+  fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
+}
+
+print_help :: proc()
+{
+  fmt.println( "  > ls        -> current path" )
+  fmt.println( "  > ls <path> -> specified path" )
+  fmt.println( "  > ls -dir   -> only show directories" )
+  fmt.println( "  > ls -w:XX  -> specify width" )
+  fmt.println( "  > ls -d:XX  -> specify subdir depth" )
+  fmt.println( "  > ls -f:XX  -> specify max files shown" )
+  fmt.println( "  example:" )
+  fmt.println( "  > ls some/folder\\01 -dir -w:30 -d:4 -f:14" )
 }
 
 // calls the recursive function
 search_directory :: proc( name: string )
 {
   // name_short := str.cut( name, 0, 3 )
-  fmt.println( DIR_ICON, name ) 
+  fmt.println( LINE_ACT ) 
   fmt.print( LINE_ACT, CONFIG_ICON, " " ) 
   fmt.print( "width: ", MAX_LINE_WIDTH, ", subdir depth: ", SUBDIR_DEPTH_MAX )
   fmt.print( "\n" )
@@ -246,6 +259,8 @@ search_directory :: proc( name: string )
     fmt.print( LINE_ACT, CONFIG_ICON, " preset: ", active_preset ) 
     fmt.print( "\n" )
   }
+  // fmt.println( LINE_ACT ) 
+  fmt.println( DIR_ICON, name ) 
   fmt.println( LINE_ACT ) 
 
   search_directory_recursive( name )
@@ -341,7 +356,8 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     if !hide_icon
     {
       if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
-      else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
+      else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON ); char_count += 3 }
+      // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
     }
     else
     {
@@ -349,7 +365,7 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
       else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
     }
   }
-  else           { fmt.printf( LINE_INACT ); char_count += 1 }
+  else { fmt.printf( LINE_INACT ); char_count += 1 }
 
   start := offset < 2 ? 0 : offset -1
   for i in 0 ..< offset
@@ -361,7 +377,8 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
       if !hide_icon
       {
         if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
-        else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
+        else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON); char_count += 3 }
+        // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
       }
       else
       {
@@ -405,13 +422,15 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     // else                   { fmt.printf( "XX" ); char_count += 1 }
     fmt.printf( "  " ); char_count += 2 
 
-    fmt.printf("\033[%d;%d;%dm", 2, 30, 40) // mode, fg, bg
+    // fmt.printf("\033[%d;%d;%dm", 2, 30, 40) // mode, fg, bg
+    fmt.printf( "\033[%d;%dm", PF_DIM, PF_WHITE )
     for i in 0 ..< max_chars
     {
       fmt.printf( "." )
     }
     // fmt.printf( "%2d", max_chars )
-    fmt.printf("\033[%d;%d;%dm", 0, 37, 40) // mode, fg, bg
+    // fmt.printf("\033[%d;%d;%dm", 0, 37, 40) // mode, fg, bg
+    fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
 
     // fmt.printf( "%dmb, % 4dkb, % 4db", fi.size / 1000000, fi.size / 1000, fi.size ) 
 
