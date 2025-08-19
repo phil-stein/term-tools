@@ -44,9 +44,50 @@ FILE_ICON := "󰈙"
 CONFIG_ICON :: ""
 
 
-PF_NORMAL :: 0
-PF_DIM    :: 2
-PF_WHITE  :: 37 
+PF_Mode :: enum
+{
+  NORMAL     = 0,
+  BOLD       = 1,    // bright
+  DIM        = 2,
+  ITALIC     = 3,
+  UNDERLINE  = 4,
+  REVERSE    = 5,
+  HIDDEN     = 6,
+}
+// @DOC: used for setting terminal output to a specific text color, using PF_MODE(), PF_STYLE, etc.
+PF_Fg :: enum
+{
+  BLACK    = 30,
+  RED      = 31,
+  GREEN    = 32,
+  YELLOW   = 33,
+  BLUE     = 34,
+  PURPLE   = 35,
+  CYAN     = 36,
+  WHITE    = 37,
+}
+// @DOC: used for setting terminal output to a specific background color, using PF_MODE(), PF_STYLE, etc.
+PF_Bg :: enum
+{
+  BLACK    = 40,
+  RED      = 41,
+  GREEN    = 42,
+  YELLOW   = 43,
+  BLUE     = 44,
+  PURPLE   = 45,
+  CYAN     = 46,
+  WHITE    = 47, 
+}
+// @DOC: setting terminal output to a specific mode, text and background color
+pf_mode :: #force_inline proc(style: PF_Mode, fg: PF_Fg, bg: PF_Bg) { fmt.printf("\033[%d;%d;%dm", style, fg, bg) }
+// @DOC: setting terminal output to a specific mode and text color
+pf_style  :: #force_inline proc(style: PF_Mode, color: PF_Fg)       { fmt.printf("\033[%d;%dm", style, color) }
+// @DOC: setting terminal output to a specific text color
+pf_color :: #force_inline proc(color: PF_Fg)                        { pf_style(PF_Mode.NORMAL, color) }
+// @DOC: setting terminal output to default mode, text and background color
+pf_mode_reset :: #force_inline proc()                               { pf_mode(PF_Mode.NORMAL, PF_Fg.WHITE, PF_Bg.BLACK) }
+// @DOC: setting terminal output to default mode and text
+pf_style_reset :: #force_inline proc()                              { pf_style(PF_Mode.NORMAL, PF_Fg.WHITE) }
 
 path_to_exec : string
 
@@ -224,7 +265,8 @@ main :: proc()
   }
 
   // @NOTE: hacky reset shouldnt be needed, but just in case
-  fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
+  // fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
+  pf_style_reset()
 }
 
 print_help :: proc()
@@ -423,14 +465,16 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     fmt.printf( "  " ); char_count += 2 
 
     // fmt.printf("\033[%d;%d;%dm", 2, 30, 40) // mode, fg, bg
-    fmt.printf( "\033[%d;%dm", PF_DIM, PF_WHITE )
+    // fmt.printf( "\033[%d;%dm", PF_DIM, PF_WHITE )
+    pf_style( PF_Mode.DIM, PF_Fg.WHITE )
     for i in 0 ..< max_chars
     {
       fmt.printf( "." )
     }
     // fmt.printf( "%2d", max_chars )
     // fmt.printf("\033[%d;%d;%dm", 0, 37, 40) // mode, fg, bg
-    fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
+    // fmt.printf( "\033[%d;%dm", PF_NORMAL, PF_WHITE )
+    pf_style_reset()
 
     // fmt.printf( "%dmb, % 4dkb, % 4db", fi.size / 1000000, fi.size / 1000, fi.size ) 
 
