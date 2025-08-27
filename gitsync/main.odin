@@ -177,6 +177,7 @@ call_git_push :: proc( commit_message: string, remote := "origin", branch := "ma
     }
     util.pf_style_reset()
 
+    libc.system( "del .git\\index.lock" )
     libc.system( "git add ." )
     libc.system( fmt.ctprintf( "git commit -m \"%v\"", commit_message) )
     libc.system( fmt.ctprintf( "git push %v %v", remote, branch) )
