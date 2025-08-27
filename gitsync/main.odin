@@ -34,8 +34,9 @@ config_t :: struct
 {
   available : bool, // if gitsync.config actually defines this preset
   
-  paths     : [dynamic]string,
-  concise   : bool,
+  paths    : [dynamic]string,
+  concise  : bool,
+  utf8     : bool,
 }
 config : config_t
 
@@ -50,7 +51,7 @@ main :: proc()
     win.SetConsoleOutputCP( win.CODEPAGE(win.CP_UTF8) )
   }
 
-  fmt.println( "current_dir:", os.get_current_directory() )
+  // fmt.println( "current_dir:", os.get_current_directory() )
   // path to executable
   buf : [256]c.wchar_t
   path_to_exec_len := win.GetModuleFileNameW( nil, &buf[0], 256 )
@@ -59,10 +60,10 @@ main :: proc()
   for i in 0 ..< path_to_exec_len - 12 // -7 to remove '\ls.exe'
   { str.write_byte( &sb, u8(buf[i]) ) }
   path_to_exec = str.to_string( sb )
-  fmt.println( "GetModuleFileName():", path_to_exec )
+  // fmt.println( "GetModuleFileName():", path_to_exec )
  
   config_path := str.concatenate( []string{ path_to_exec, "\\..\\config\\gitsync.config" }, context.temp_allocator )
-  fmt.println( "config_path:", config_path )
+  // fmt.println( "config_path:", config_path )
   config_read( config_path, &config )
 
 
@@ -113,21 +114,30 @@ call_git_status :: proc()
   {
     // fmt.println( "config.path:", path )
 
-    // path_clone, err_0 := str.clone( path )
-    // if err_0 != .None { fmt.println( "[ERROR]", err_0, "cloning path:", path ); continue }
-
     p := expand_environment_variable( path )
     // fmt.println( "p:", p )
     err_1    := os.set_current_directory( p )
     if err_1 != os.ERROR_NONE { fmt.println( "[ERROR]", err_1, ", for path:", path ); continue } 
 
-    util.pf_color( util.PF_Fg.WHITE ) 
-    fmt.print( "" )
-    util.pf_mode( util.PF_Mode.UNDERLINE, util.PF_Fg.BLACK, util.PF_Bg.WHITE ) 
-    fmt.print( "", path )
-    util.pf_style_reset()
-    util.pf_color( util.PF_Fg.WHITE ) 
-    fmt.print( "\n" )
+    if config.utf8
+    {
+      util.pf_color( util.PF_Fg.WHITE ) 
+      fmt.print( "" )
+    }
+    util.pf_mode( util.PF_Mode.BOLD, util.PF_Fg.BLACK, util.PF_Bg.WHITE ) 
+    fmt.print( config.utf8 ? "" : "#", path )
+    if config.utf8
+    {
+      util.pf_style_reset()
+      util.pf_color( util.PF_Fg.WHITE ) 
+      fmt.print( "\n" )
+      util.pf_style_reset()
+    } 
+    else 
+    { 
+      util.pf_style_reset()
+      fmt.print( "\n" ) 
+    }
     util.pf_style_reset()
 
     // @TODO: how to get the output of this operation as string, for proper formatting
@@ -146,14 +156,27 @@ call_git_push :: proc( commit_message: string, remote := "origin", branch := "ma
     err_1    := os.set_current_directory( p )
     if err_1 != os.ERROR_NONE { fmt.println( "[ERROR]", err_1, ", for path:", path ); continue } 
 
-    util.pf_color( util.PF_Fg.WHITE ) 
-    fmt.print( "" )
+    if config.utf8
+    {
+      util.pf_color( util.PF_Fg.WHITE ) 
+      fmt.print( "" )
+    }
     util.pf_mode( util.PF_Mode.UNDERLINE, util.PF_Fg.BLACK, util.PF_Bg.WHITE ) 
-    fmt.print( "", path )
+    fmt.print( config.utf8 ? "" : "#", path )
     util.pf_style_reset()
-    util.pf_color( util.PF_Fg.WHITE ) 
-    fmt.print( "\n" )
+    if config.utf8
+    {
+      util.pf_color( util.PF_Fg.WHITE ) 
+      fmt.print( "\n" )
+      util.pf_style_reset()
+    } 
+    else 
+    { 
+      fmt.print( "\n" ) 
+      util.pf_style_reset()
+    }
     util.pf_style_reset()
+
     libc.system( "git add ." )
     libc.system( fmt.ctprintf( "git commit -m \"%v\"", commit_message) )
     libc.system( fmt.ctprintf( "git push %v %v", remote, branch) )
@@ -191,6 +214,7 @@ config_read :: proc( path: string, config: ^config_t )
 {
   // set default values for presets
   config.available = true 
+  config.utf8      = true
 
   // read config file
   
@@ -254,9 +278,17 @@ handle_value :: proc( name: string, value: string, conf: ^config_t )
     if !ok 
     { fmt.eprintfln( "[ERROR] concise value given not boolean: \"%s\"", value ); return }
     conf.concise = val  
-    fmt.println( "conf.concise:", conf.concise )
+    // fmt.println( "conf.concise:", conf.concise )
   }
-  else { fmt.println( "[ERROR] argument with unknown name: ", name ) }
+  else if name == "utf8"
+  {
+    val, ok := v.(bool)
+    if !ok 
+    { fmt.eprintfln( "[ERROR] utf8 value given not boolean: \"%s\"", value ); return }
+    conf.utf8 = val  
+    // fmt.println( "conf.utf8:", conf.utf8 )
+  }
+  else { fmt.println( "[ERROR] config argument with unknown name: ", name ) }
 }
 parse_value :: proc( value: string ) -> ( v: parsed_value_t, success: bool )
 {
