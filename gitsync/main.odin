@@ -141,6 +141,19 @@ call_git_push :: proc( commit_message: string, remote := "origin", branch := "ma
 {
   for path in config.paths
   {
+    p := expand_environment_variable( path )
+    // fmt.println( "p:", p )
+    err_1    := os.set_current_directory( p )
+    if err_1 != os.ERROR_NONE { fmt.println( "[ERROR]", err_1, ", for path:", path ); continue } 
+
+    util.pf_color( util.PF_Fg.WHITE ) 
+    fmt.print( "" )
+    util.pf_mode( util.PF_Mode.UNDERLINE, util.PF_Fg.BLACK, util.PF_Bg.WHITE ) 
+    fmt.print( "", path )
+    util.pf_style_reset()
+    util.pf_color( util.PF_Fg.WHITE ) 
+    fmt.print( "\n" )
+    util.pf_style_reset()
     libc.system( "git add ." )
     libc.system( fmt.ctprintf( "git commit -m \"%v\"", commit_message) )
     libc.system( fmt.ctprintf( "git push %v %v", remote, branch) )
