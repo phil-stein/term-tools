@@ -80,3 +80,7 @@ __todo__
   - [ ] git wrapper ?
     - > xyz "<message>"
     - -> git add & commit -m "USER: <message>" & push 
+  - [ ] cat
+    - [ ] dump md files
+
+

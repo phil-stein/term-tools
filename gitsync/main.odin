@@ -214,7 +214,8 @@ expand_environment_variable :: proc( var_str_in: string ) -> ( string )
 config_read :: proc( path: string, config: ^config_t )
 {
   // set default values for presets
-  config.available = true 
+  config.available = false
+  config.concise   = true
   config.utf8      = true
 
   // read config file
@@ -223,12 +224,21 @@ config_read :: proc( path: string, config: ^config_t )
   if !ok || len( src_bytes ) <= 0
   { fmt.eprintln( "[ERROR] could not read config file: ", path ); return }
   defer delete( src_bytes, context.allocator )
+  config.available = true
   src     := string( src_bytes )
   src_len := len( src )
   
   for i := 0; i < src_len; i += 1
   {
-    if src[i] == '['
+    // skip comments
+    if i +1 < src_len   &&
+       src[i   ] == '/' &&
+       src[i +1] == '/'  
+    {
+      for i < src_len && src[i] != '\n' 
+      { i += 1 }
+    } // arguments
+    else if src[i] == '['
     {
       // read name
       i += 1  // skip [
@@ -257,21 +267,17 @@ config_read :: proc( path: string, config: ^config_t )
 
 handle_value :: proc( name: string, value: string, conf: ^config_t )
 {
-
-
   if name == "path" 
   {
-    // fmt.println( "path: '", value, "'" )
-
     // put path in the config paths array
     append( &config.paths, str.clone( value ) )
-    
     return
   }
 
   // for normal values
   v, succsess := parse_value( value )
-  if ( v == nil || !succsess ) && !str.contains( value, "{" )  { return }
+  if ( v == nil || !succsess ) && !str.contains( value, "{" )  
+  { fmt.eprintfln( "[ERROR] value given for [%v] failed to parse: \"%s\"", name, value ); return }
   
   if name == "concise"
   {
@@ -289,8 +295,9 @@ handle_value :: proc( name: string, value: string, conf: ^config_t )
     conf.utf8 = val  
     // fmt.println( "conf.utf8:", conf.utf8 )
   }
-  else { fmt.println( "[ERROR] config argument with unknown name: ", name ) }
+  else { fmt.printfln( "[ERROR] config argument with unknown name: [%v]", name ) }
 }
+
 parse_value :: proc( value: string ) -> ( v: parsed_value_t, success: bool )
 {
   if      str.compare( value, "true" )  == 0 { return true,  true }
