@@ -23,9 +23,15 @@ odin build ls -out:bin\ls.exe -vet-shadowing %CUSTOM_ATTRIBUTES%
 
 cd test
 search ui_display_struct_members
+echo --------------------------------------------
 gitsync
+echo --------------------------------------------
 cat name.txt
+echo --------------------------------------------
 notizn
+echo --------------------------------------------
 ls
+echo --------------------------------------------
 :: cpy
+:: echo --------------------------------------------
 cd ..

@@ -14,14 +14,14 @@
         - cccc
 
   - [ ] a
-    - [X] a
+    - [X] aa
   - [X] b
-    - [ ] b
-      - [ ] b
+    - [ ] bb
+      - [ ] bbb
   - [ ] c
-    - [X] c
-      - [ ] c
-        - [X] c 
+    - [X] cc
+      - [ ] ccc
+        - [X] cccc 
 
 [link name](link)
 ![image link](pp_pic.png)
@@ -31,3 +31,35 @@
 | value | value | value |
 | value | value | value |
 | value | value | value |
+
+hey there <span alt="de"> text </span> more text
+text <img src="cock"> text 
+
+text `text` text
+
+```c
+#include <stdio.h>
+
+int a = 2;
+
+int main( char** argv, int argc )
+{
+  printf( "hello, there" );
+  return 1;
+}
+```
+
+text
+
+```odin
+package main
+
+import "core:fmt"
+
+a : int = 0
+
+main :: proc()
+{
+  fmt.println( "hello, world" )
+}
+```
