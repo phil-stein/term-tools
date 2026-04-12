@@ -209,6 +209,7 @@ cat_md :: proc( txt: ^string )
 {
   sb := str.builder_make()
 
+  syntax_act := true
   in_code_block := false
   line_nr := 1
 	for line in str.split_lines_iterator(txt) 
@@ -217,6 +218,8 @@ cat_md :: proc( txt: ^string )
     if config.line_nr { str.write_string( &sb, fmt.tprintf( "%3d %v ", line_nr, config.utf8 ? "│" : "|" ) ) }
 
     if in_code_block && config.ansi_color { str.write_string( &sb, util.pf_mode_str( util.PF_Mode.DIM, util.PF_Fg.WHITE, util.PF_Bg.BLACK ) ) }
+
+    syntax_act = !in_code_block
 
     // for i in 0..<len
     for i := 0; i < len; i += 1
@@ -227,12 +230,12 @@ cat_md :: proc( txt: ^string )
       found_checklist := false
       for i + i_offs < len
       {
-        if str.is_space( rune(line[i + i_offs]) )
+        if syntax_act && str.is_space( rune(line[i + i_offs]) )
         {
           i_offs += 1
           continue
         }
-        else
+        else if syntax_act
         {
           if line[i + i_offs] == '#'
           {
@@ -315,7 +318,8 @@ cat_md :: proc( txt: ^string )
 
 
       // --- links ---
-      if i < len +1 &&       
+      if syntax_act &&
+         i < len +1 &&       
          line[i +0] == '[' 
       {
         name_start := i +1
@@ -346,7 +350,7 @@ cat_md :: proc( txt: ^string )
 
         continue
       }
-      else
+      else if syntax_act
       { 
         // --- links ---
         if i < len +1 &&       
@@ -361,10 +365,12 @@ cat_md :: proc( txt: ^string )
         }
       }
       // --- html tags ---
-      if i < len +1 &&       
+      if syntax_act &&
+         i +1 < len &&       
          line[i +0] == '<' 
       {
         start := i +1
+        // if i +1 < len && line[i +1] == '/' { ahhhhhhh and tag }
         end   := i +1
         found := false
 
@@ -376,10 +382,54 @@ cat_md :: proc( txt: ^string )
         }
         if found
         {
-          if config.ansi_color { str.write_string( &sb, util.pf_style_str( util.PF_Mode.DIM, util.PF_Fg.BLACK) ) }
-          str.write_string( &sb, fmt.tprintf( "<%v>", line[start:end +1] ) )
+
+          CODE_BLOCK_MODE :: util.PF_Mode.DIM
+          CODE_BLOCK_FG   :: util.PF_Fg.BLACK
+
+          HTML_TAG_NAME_MODE :: util.PF_Mode.DIM
+          HTML_TAG_NAME_FG   :: util.PF_Fg.RED
+          if config.ansi_color { str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) ) }
+          // @TODO: highlight span / p / etc.
+          // str.write_string( &sb, fmt.tprintf( "<%v>", line[start:end +1] ) )
+          str.write_byte( &sb, '<' ) 
+          for idx := start; idx < end+1; idx += 1
+          {
+            if config.ansi_color &&
+                    idx +4 < end +1   &&
+                    line[idx +1] == 's' &&
+                    line[idx +2] == 'p' &&
+                    line[idx +3] == 'a' &&
+                    line[idx +4] == 'n'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "span" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 4
+            }
+            else if config.ansi_color &&
+               idx +1 < end +1   &&
+               line[idx +1] == 'p'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "p" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 1
+            }
+            else 
+            { str.write_byte( &sb, line[idx] ) }
+
+          }
+          str.write_byte( &sb, '>' ) 
           if config.ansi_color { str.write_string( &sb, util.pf_style_reset_str() ) }
           i += i_offs
+          // @TODO: highlight span / p / etc.
+          // <br> tag as newline
+          if i +3 < len        &&
+             line[i +1] == 'b' && 
+             line[i +2] == 'r' && 
+             line[i +3] == '>'
+          { str.write_byte( &sb, '\n' ) }
+          
           continue
         }
       }
@@ -439,8 +489,9 @@ cat_md :: proc( txt: ^string )
         //   continue
         // }
       } 
-      else if i +1 < len && // --- inline code block ---
-         line[i +0] == '`' 
+      else if syntax_act &&
+              i +1 < len && // --- inline code block ---
+              line[i +0] == '`' 
       {
         start := i +1
         end   := i +1
@@ -454,7 +505,7 @@ cat_md :: proc( txt: ^string )
         }
         if found
         {
-          if config.ansi_color { str.write_string( &sb, util.pf_mode_str( util.PF_Mode.DIM, util.PF_Fg.WHITE, util.PF_Bg.BLACK ) ) W}
+          if config.ansi_color { str.write_string( &sb, util.pf_mode_str( util.PF_Mode.DIM, util.PF_Fg.WHITE, util.PF_Bg.BLACK ) ) }
           str.write_string( &sb, fmt.tprintf( "%v", line[start:end +1] ) )
           if config.ansi_color { str.write_string( &sb, util.pf_style_reset_str() ) }
           i += i_offs
@@ -541,6 +592,8 @@ config_read :: proc( path: string, config: ^config_t )
 
 handle_value :: proc( name: string, value: string, conf: ^config_t )
 {
+  // strings
+  // ...
   // for normal values
   v, succsess := parse_value( value )
   if ( v == nil || !succsess ) && !str.contains( value, "{" )  
@@ -560,7 +613,7 @@ handle_value :: proc( name: string, value: string, conf: ^config_t )
     if !ok 
     { fmt.eprintfln( "[ERROR] color value given not boolean: \"%s\"", value ); return }
     conf.ansi_color = val  
-    fmt.println( "conf.ansi_color:", conf.ansi_color )
+    // fmt.println( "conf.ansi_color:", conf.ansi_color )
   }
   else if name == "line_nr"
   {
@@ -568,6 +621,14 @@ handle_value :: proc( name: string, value: string, conf: ^config_t )
     if !ok 
     { fmt.eprintfln( "[ERROR] line_nr value given not boolean: \"%s\"", value ); return }
     conf.line_nr = val  
+  }
+  else if name == "code-block-width"
+  {
+    val, ok := v.(int)
+    if !ok 
+    { fmt.eprintfln( "[ERROR] code-block-width value given not int: \"%s\"", value ); return }
+    conf.code_block_min_width = val  
+    fmt.println( "conf.code-block-width:", conf.code_block_min_width )
   }
   else if len(name) > 6  &&
           name[0] == 's' &&

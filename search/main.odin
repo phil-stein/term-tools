@@ -4,6 +4,7 @@ import      "core:os"
 import      "core:fmt"
 import str  "core:strings"
 import      "core:math/bits"
+import win  "core:sys/windows"
 import util ".."
 
 
@@ -43,7 +44,13 @@ path_arg_idx := 1
 found_matches := 0
 
 main :: proc()
-{
+{  
+  when ODIN_OS == .Windows
+  {
+    // @NOTE: enable utf output to console, windows specific
+    win.SetConsoleOutputCP( win.CODEPAGE(win.CP_UTF8) )
+  }
+
   for arg, i in os.args[1:]
   {
     if arg[0] == '-' 
@@ -116,6 +123,14 @@ search_directory_recursive :: proc( name: string )
     file_count  += 1
 
     if fi.is_dir { continue }
+    extension := str.split( fi.name, "." )
+    // fmt.println( extension )
+    defer delete( extension )
+    if len(extension) > 1 && ( extension[1] == "lib" || extension[1] == "obj" )
+    { 
+      fmt.println( "!!! skipped", fi.name )
+      continue
+    }
     
     if !search_file( fi, os.args[path_arg_idx] )
     {
@@ -175,7 +190,10 @@ search_directory_recursive :: proc( name: string )
       DIR_ICON = tmp_dir_icon
       LINE_ACT = tmp
     }
+
+    fmt.println( LINE_ACT ) 
   }
+
 }
 
 print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: bool = false, name_override: bool = false, new_name: string = "" )
@@ -296,6 +314,7 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
 	defer delete( data, context.allocator )
 
   found_text = false
+  current_matches := 0
   line_nr := 0
 	it := string( data )
 	for line in str.split_lines_iterator( &it ) 
@@ -304,7 +323,8 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
 		// process line
     if str.contains( line, match )
     {
-      if found_matches <= 0
+      // if found_matches <= 0
+      if current_matches <= 0 
       {
         fmt.println( DIR_ICON /* CONFIG_ICON */, os.get_current_directory() )
         // -- ─│─│┌┐┘└           -> window corners
@@ -313,7 +333,8 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
 
       found_text = true
       found_matches += 1
-      fmt.println( LINE_ACT, line_nr, LINE_ACT, line )
+      current_matches += 1
+      fmt.printfln( "%s %03d %s %v", LINE_ACT, line_nr, LINE_ACT, line )
     }
 	}
   return found_text

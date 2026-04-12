@@ -67,6 +67,9 @@ main :: proc()
   config_read( config_path, &config )
 
 
+  @TODO :
+  std : os.Handle = os.get_std_handle()
+
   // check for args
   //    -h    -> help
   //    -push:"commit message" -> push all repos in gitsync.config
