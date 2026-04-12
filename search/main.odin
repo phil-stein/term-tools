@@ -22,9 +22,9 @@ MAX_LINE_WIDTH := 50  // with of line without the size
 ONLY_SHOW_DIRS := false 
 
 // LINE_INACT :: "┆"
-// LINE_INACT :: "┊" 
+LINE_INACT :: "┊" 
 // LINE_INACT :: "╏"
-LINE_INACT :: "╎"
+// LINE_INACT :: "╎"
 LINE_ACT   := "│"
 
 // DIR_ENTER  :: "╰"
@@ -126,9 +126,10 @@ search_directory_recursive :: proc( name: string )
     extension := str.split( fi.name, "." )
     // fmt.println( extension )
     defer delete( extension )
-    if len(extension) > 1 && ( extension[1] == "lib" || extension[1] == "obj" )
+    if len(extension) > 1 && ( extension[1] == "lib" || extension[1] == "obj" || extension[1] == "exe" || extension[1] == "a" || 
+                               extension[1] == "png" || extension[1] == "jpg"|| extension[1] == "jpeg" || extension[1] == "mp4" || extension[1] == "" )
     { 
-      fmt.println( "!!! skipped", fi.name )
+      fmt.println( LINE_INACT, "!!! skipped", fi.name )
       continue
     }
     

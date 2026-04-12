@@ -384,11 +384,11 @@ search_file_match_str :: proc( fi_name, line, match_str: string, match_str_type:
 
     // str is idx -> end
     msg := str.cut( line, idx, end - idx)
-    log.info( "msg: ", msg )
+    // log.info( "msg: ", msg )
 
     if !printed_file_name { print_file_name( fi_name ); printed_file_name = true }
 
-    print_message( msg, match_str_type )
+    print_message( msg, match_str_type, line_nr )
 
     return printed_file_name, true
   }
@@ -399,12 +399,12 @@ print_file_name :: proc( name: string )
 {
   fmt.println( "", name )
 }
-print_message :: proc( msg: string, type: Message_Type )
+print_message :: proc( msg: string, type: Message_Type, line_nr: int )
 {
   fmt.print( "└ " )
   // fmt.print( "- " )
 
-	fmt.print( DARK_GREY )
+	fmt.printf( "%s%03d |", DARK_GREY, line_nr )
   switch type
   {
     case Message_Type.NOTE:
