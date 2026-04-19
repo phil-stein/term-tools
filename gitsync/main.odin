@@ -66,10 +66,6 @@ main :: proc()
   // fmt.println( "config_path:", config_path )
   config_read( config_path, &config )
 
-
-  @TODO :
-  std : os.Handle = os.get_std_handle()
-
   // check for args
   //    -h    -> help
   //    -push:"commit message" -> push all repos in gitsync.config
@@ -119,7 +115,7 @@ call_git_status :: proc()
 
     p := expand_environment_variable( path )
     // fmt.println( "p:", p )
-    err_1    := os.set_current_directory( p )
+    err_1    := os.set_working_directory( p )
     if err_1 != os.ERROR_NONE { fmt.println( "[ERROR]", err_1, ", for path:", path ); continue } 
 
     if config.utf8
@@ -156,7 +152,7 @@ call_git_push :: proc( commit_message: string, remote := "origin", branch := "ma
   {
     p := expand_environment_variable( path )
     // fmt.println( "p:", p )
-    err_1    := os.set_current_directory( p )
+    err_1    := os.set_working_directory( p )
     if err_1 != os.ERROR_NONE { fmt.println( "[ERROR]", err_1, ", for path:", path ); continue } 
 
     if config.utf8
@@ -199,7 +195,8 @@ expand_environment_variable :: proc( var_str_in: string ) -> ( string )
   }
   // win.LPCWSTR
   // win.LPWSTR
-  ret := win.ExpandEnvironmentStringsW( raw_data(&var_str), raw_data(&buf), EXP_ENV_VAR_BUF_MAX )
+  var_str_ptr := raw_data(&var_str)
+  ret := win.ExpandEnvironmentStringsW( cstring16(var_str_ptr), raw_data(&buf), EXP_ENV_VAR_BUF_MAX )
   if ret <= 0 { fmt.println( "[ERROR] win.ExpandEnvironmentStringsW failed with:", var_str ) }
   // fmt.println( "ret:", ret )
   buf_str_sb := str.builder_make( context.temp_allocator )
@@ -223,8 +220,8 @@ config_read :: proc( path: string, config: ^config_t )
 
   // read config file
   
-  src_bytes, ok := os.read_entire_file( path, context.allocator )
-  if !ok || len( src_bytes ) <= 0
+  src_bytes, err := os.read_entire_file( path, context.allocator )
+  if err != os.ERROR_NONE || len( src_bytes ) <= 0
   { fmt.eprintln( "[ERROR] could not read config file: ", path ); return }
   defer delete( src_bytes, context.allocator )
   config.available = true

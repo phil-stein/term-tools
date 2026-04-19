@@ -355,8 +355,6 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
       current_matches += 1
       // fmt.printfln( "%s %03d %s %v", LINE_ACT, line_nr, LINE_ACT, line )
       fmt.printf( "%s %03d %s", LINE_ACT, line_nr, LINE_ACT)
-      // sb := str.builder_make()
-      // for i in 0..<len(line)
       print_highlited_match( line, match )
     }
 	}
