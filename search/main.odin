@@ -33,6 +33,8 @@ LINE_ACT   := "│"
 // DIR_ENTER  :: "━"
 DIR_ENTER  :: "└"
 
+FILE_NAME_MATCH  :: "├"
+
 DIR_ICON  := ""
 FILE_ICON := "󰈙"
 
@@ -74,9 +76,14 @@ main :: proc()
   // path := str.concatenate( { os.get_current_directory(), "\\", os.args[path_arg_idx] } )
   // fmt.println( "path: ", os.get_current_directory() )
 
-  search_directory( os.get_current_directory() )
+  path, err := os.get_working_directory( context.temp_allocator )
+  if err != os.ERROR_NONE { fmt.eprintln( "[ERROR] couldnt open executable directory" ); return } 
+  fmt.println( DIR_ICON /* CONFIG_ICON */, path )
+
+  search_directory( path )
 
   fmt.println( "└", found_matches, "matches found for:", os.args[path_arg_idx] )
+  fmt.println()
 }
 
 print_help :: proc()
@@ -105,9 +112,9 @@ search_directory_recursive :: proc( name: string )
   }
 
   fis: []os.File_Info
-  defer os.file_info_slice_delete( fis ) // fis is a slice, we need to remember to free it
+  defer os.file_info_slice_delete( fis, context.temp_allocator ) // fis is a slice, we need to remember to free it
 
-  fis, err = os.read_dir(f, -1) // -1 reads all file infos
+  fis, err = os.read_dir(f, -1, context.temp_allocator ) // -1 reads all file infos
   if err != os.ERROR_NONE 
   {
     fmt.eprintln( "[ERROR] could not read directory: ", name )
@@ -122,12 +129,13 @@ search_directory_recursive :: proc( name: string )
     total_files += 1
     file_count  += 1
 
-    if fi.is_dir { continue }
+    if fi.type == os.File_Type.Directory { continue }
     extension := str.split( fi.name, "." )
     // fmt.println( extension )
     defer delete( extension )
-    if len(extension) > 1 && ( extension[1] == "lib" || extension[1] == "obj" || extension[1] == "exe" || extension[1] == "a" || 
-                               extension[1] == "png" || extension[1] == "jpg"|| extension[1] == "jpeg" || extension[1] == "mp4" || extension[1] == "" )
+    if len(extension) > 1 && ( extension[1] == "lib" || extension[1] == "obj" || extension[1] == "exe" || extension[1] == "a" || extension[1] == "pdb" || 
+                               extension[1] == "png" || extension[1] == "jpg"|| extension[1] == "jpeg" || extension[1] == "mp4" || 
+                               extension[1] == "blend" || extension[1] == "fbx" || extension[1] == "glb" || extension[1] == "gltf" )
     { 
       fmt.println( LINE_INACT, "!!! skipped", fi.name )
       continue
@@ -165,7 +173,7 @@ search_directory_recursive :: proc( name: string )
       // fmt.println( "3", fi.name )
     }
 
-    if fi.is_dir && subdir_depth < i32(SUBDIR_DEPTH_MAX)
+    if fi.type == os.File_Type.Directory && subdir_depth < i32(SUBDIR_DEPTH_MAX)
     {
       total_files -= 1
       total_dirs  += 1
@@ -176,7 +184,7 @@ search_directory_recursive :: proc( name: string )
       subdir_depth -= 1
       offset -= 2
     }
-    else if !ONLY_SHOW_DIRS && fi.is_dir && subdir_depth > 1 &&
+    else if !ONLY_SHOW_DIRS && fi.type == os.File_Type.Directory && subdir_depth > 1 &&
             subdir_depth >= i32(SUBDIR_DEPTH_MAX)
     {
       tmp := LINE_ACT
@@ -199,7 +207,7 @@ search_directory_recursive :: proc( name: string )
 
 print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: bool = false, name_override: bool = false, new_name: string = "" )
 {
-  if ONLY_SHOW_DIRS && !fi.is_dir { return }
+  if ONLY_SHOW_DIRS && fi.type != os.File_Type.Directory { return }
 
   char_count := 0
 
@@ -208,13 +216,13 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
   {
     if !hide_icon
     {
-      if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+      if fi.type == os.File_Type.Directory { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
       else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON ); char_count += 3 }
       // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
     }
     else
     {
-      if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+      if fi.type == os.File_Type.Directory { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
       else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
     }
   }
@@ -225,17 +233,17 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
   {
     if i == start
     { 
-      // if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, hide_icon ? "" : DIR_ICON ); char_count += 3 }
+      // if fi.type == os.File_Type.Directory { fmt.printf( "%s %s ", DIR_ENTER, hide_icon ? "" : DIR_ICON ); char_count += 3 }
       // else         { fmt.printf( "%s %s",  LINE_ACT,  hide_icon ? "" : FILE_ICON ); char_count += 3 }
       if !hide_icon
       {
-        if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+        if fi.type == os.File_Type.Directory { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
         else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON); char_count += 3 }
         // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
       }
       else
       {
-        if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+        if fi.type == os.File_Type.Directory { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
         else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
       }
     }
@@ -261,7 +269,7 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     }
     else { fmt.printf( fi.name ); char_count += len(fi.name) }
 
-    if fi.is_dir { fmt.printf( "\\" ); char_count += 1 }
+    if fi.type == os.File_Type.Directory { fmt.printf( "\\" ); char_count += 1 }
   }
 
   // fmt.printf( " % *d", 30 - char_count, fi.size ) 
@@ -269,7 +277,7 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
   max_chars = MAX_LINE_WIDTH - char_count
   assert( max_chars >= 0 )
 
-  if !fi.is_dir && !hide_size
+  if fi.type != os.File_Type.Directory && !hide_size
   {
     // if      max_chars >= 3 { fmt.printf( "  " ); char_count += 2 }
     // else                   { fmt.printf( "XX" ); char_count += 1 }
@@ -306,13 +314,21 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
 
 search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
 {
-	data, ok := os.read_entire_file( fi.fullpath, context.allocator )
-	if !ok 
+	data, err := os.read_entire_file( fi.fullpath, context.allocator )
+	if err != os.ERROR_NONE
   {
-    fmt.eprintln( "[ERROR] could not open file for reading:", fi.name )
+    fmt.eprintln( "[ERROR] could not open file for reading:", fi.name, err )
 		return
 	}
 	defer delete( data, context.allocator )
+
+  // check file name if match
+  if str.contains( fi.name, match )
+  {
+    // print_file_name( fi )
+    fmt.printf( "%s %s", FILE_NAME_MATCH, FILE_ICON )
+    print_highlited_match( fi.name, match )
+  }
 
   found_text = false
   current_matches := 0
@@ -327,7 +343,9 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
       // if found_matches <= 0
       if current_matches <= 0 
       {
-        fmt.println( DIR_ICON /* CONFIG_ICON */, os.get_current_directory() )
+        // cwd, err2 := os.get_working_directory( context.temp_allocator )
+        // if err2 != os.ERROR_NONE { fmt.eprintln( "[ERROR] getting current working dir", err2 ); return }
+        // fmt.println( DIR_ICON /* CONFIG_ICON */, cwd )
         // -- ─│─│┌┐┘└           -> window corners
         fmt.print( "├─────┐\n" )
       }
@@ -335,8 +353,29 @@ search_file :: proc( fi: os.File_Info, match: string ) -> ( found_text: bool )
       found_text = true
       found_matches += 1
       current_matches += 1
-      fmt.printfln( "%s %03d %s %v", LINE_ACT, line_nr, LINE_ACT, line )
+      // fmt.printfln( "%s %03d %s %v", LINE_ACT, line_nr, LINE_ACT, line )
+      fmt.printf( "%s %03d %s", LINE_ACT, line_nr, LINE_ACT)
+      // sb := str.builder_make()
+      // for i in 0..<len(line)
+      print_highlited_match( line, match )
     }
 	}
   return found_text
+}
+
+print_highlited_match :: proc( txt, match: string )
+{
+  for i := 0; i < len(txt); i += 1
+  {
+    if i + len(match) < len(txt) - i && 
+       txt[i:i+len(match)] == match
+    {
+      fmt.print( util.pf_mode_str( util.PF_Mode.NORMAL, util.PF_Fg.BLACK, util.PF_Bg.WHITE ))
+      fmt.print( match )
+      fmt.print( util.pf_style_reset_str() )
+      i += len(match) -1
+    }
+    else { fmt.printf( "%c", txt[i] ) }
+  }
+  fmt.println()
 }
