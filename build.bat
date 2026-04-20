@@ -17,12 +17,12 @@ SET CUSTOM_ATTRIBUTES=-custom-attribute:NOTE -custom-attribute:TODO -custom-attr
 :: del bin\search.exe
 :: odin build search -out:bin\search.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
 
-del bin\gitsync.exe
-odin build gitsync -out:bin\gitsync.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
+:: del bin\gitsync.exe
+:: odin build gitsync -out:bin\gitsync.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
 
 :: @TODO: .md syntax html tags
-:: del bin\cat.exe
-:: odin build cat -out:bin\cat.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
+del bin\cat.exe
+odin build cat -out:bin\cat.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
 
 :: del bin\notizn.exe
 :: odin build notizn -out:bin\notizn.exe -vet-shadowing %DEBUG% %CUSTOM_ATTRIBUTES%
@@ -39,8 +39,8 @@ cd test
 :: img test\Oil-Barrel.png
 :: search ui_display_struct_members
 :: search import
-gitsync
-:: cat mark.md
+:: gitsync
+cat mark.md
 :: notizn
 :: ls
 :: cpy

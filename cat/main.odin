@@ -72,9 +72,11 @@ main :: proc()
   {
     fmt.printfln( " %v", os.args[1] )
 
-    txt, ok := os.read_entire_file_from_filename( os.args[1] )
+    // txt, ok := os.read_entire_file_from_filename( os.args[1] )
+    txt, err := os.read_entire_file_from_path( os.args[1], context.allocator )
+    defer delete(txt)
 
-    if !ok { fmt.println( "[ERROR] could not find file:", os.args[1] ) }
+    if err != os.ERROR_NONE { fmt.println( "[ERROR] could not find file:", os.args[1] ) }
     else
     {
       defer delete( txt )
@@ -392,28 +394,94 @@ cat_md :: proc( txt: ^string )
           // @TODO: highlight span / p / etc.
           // str.write_string( &sb, fmt.tprintf( "<%v>", line[start:end +1] ) )
           str.write_byte( &sb, '<' ) 
+          
+          if line[start] == '/' 
+          { str.write_byte( &sb, '/' ); start += 1 }
+          
           for idx := start; idx < end+1; idx += 1
           {
             if config.ansi_color &&
-                    idx +4 < end +1   &&
-                    line[idx +1] == 's' &&
-                    line[idx +2] == 'p' &&
-                    line[idx +3] == 'a' &&
-                    line[idx +4] == 'n'
+                    idx +3 < end +1   &&
+                    line[idx +0] == 's' &&
+                    line[idx +1] == 'p' &&
+                    line[idx +2] == 'a' &&
+                    line[idx +3] == 'n'
             { 
               str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
               str.write_string( &sb, "span" ) 
               str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
-              idx += 4
+              idx += 3
             }
             else if config.ansi_color &&
-               idx +1 < end +1   &&
-               line[idx +1] == 'p'
+               idx +2 < end +1        &&
+               line[idx +0] == 'i'    &&
+               line[idx +1] == 'm'    &&
+               line[idx +2] == 'g'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "img" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 2 
+            }
+            else if config.ansi_color &&
+               idx +2 < end +1        &&
+               line[idx +0] == 'd'    &&
+               line[idx +1] == 'i'    &&
+               line[idx +2] == 'v'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "div" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 2
+            }
+            else if config.ansi_color &&
+               idx +1 < end +1        &&
+               line[idx +0] == 't'    &&
+               line[idx +1] == 'r'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "tr" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 1
+            }
+            else if config.ansi_color &&
+               idx +1 < end +1        &&
+               line[idx +0] == 't'    &&
+               line[idx +1] == 'h'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "th" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 1
+            }
+            else if config.ansi_color &&
+               idx +1 < end +1        &&
+               line[idx +0] == 't'    &&
+               line[idx +1] == 'd'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "td" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 1
+            }
+            else if config.ansi_color &&
+               idx +1 < end +1        &&
+               line[idx +0] == 'b'    &&
+               line[idx +1] == 'r'
+            { 
+              str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
+              str.write_string( &sb, "br" ) 
+              str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
+              idx += 1
+            }
+            else if config.ansi_color &&
+               idx +0 < end +1        &&
+               line[idx +0] == 'p'      
             { 
               str.write_string( &sb, util.pf_style_str( HTML_TAG_NAME_MODE, HTML_TAG_NAME_FG ) ) 
               str.write_string( &sb, "p" ) 
               str.write_string( &sb, util.pf_style_str( CODE_BLOCK_MODE, CODE_BLOCK_FG ) )
-              idx += 1
+              idx += 0
             }
             else 
             { str.write_byte( &sb, line[idx] ) }
@@ -422,13 +490,6 @@ cat_md :: proc( txt: ^string )
           str.write_byte( &sb, '>' ) 
           if config.ansi_color { str.write_string( &sb, util.pf_style_reset_str() ) }
           i += i_offs
-          // @TODO: highlight span / p / etc.
-          // <br> tag as newline
-          if i +3 < len        &&
-             line[i +1] == 'b' && 
-             line[i +2] == 'r' && 
-             line[i +3] == '>'
-          { str.write_byte( &sb, '\n' ) }
           
           continue
         }
@@ -545,8 +606,8 @@ config_read :: proc( path: string, config: ^config_t )
 
   // read config file
   
-  src_bytes, ok := os.read_entire_file( path, context.allocator )
-  if !ok || len( src_bytes ) <= 0
+  src_bytes, err := os.read_entire_file_from_path( path, context.allocator )
+  if err != os.ERROR_NONE || len( src_bytes ) <= 0
   { fmt.eprintln( "[ERROR] could not read config file: ", path ); return }
   defer delete( src_bytes, context.allocator )
   config.available = true
