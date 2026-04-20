@@ -68,8 +68,8 @@ config_read :: proc( path: string)
 
   // read config file
   
-  src_bytes, ok := os.read_entire_file( path, context.allocator )
-  if !ok || len( src_bytes ) <= 0
+  src_bytes, err := os.read_entire_file( path, context.allocator )
+  if err != os.ERROR_NONE || len( src_bytes ) <= 0
   { fmt.eprintln( "[ERROR] could not read config file: ", path ); return }
   defer delete( src_bytes, context.allocator )
   src     := string( src_bytes )

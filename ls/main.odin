@@ -207,7 +207,9 @@ main :: proc()
   { 
     
     // path := os.get_current_directory()
-    path := str.concatenate( { os.get_current_directory(), "\\", os.args[path_arg] } )
+    cwd, err := os.get_working_directory( context.temp_allocator )
+    if err != os.ERROR_NONE { fmt.eprintln( "[ERROR] cant open CWD" ); return }
+    path := str.concatenate( { cwd, "\\", os.args[path_arg] } )
     // fmt.println( "path: ", path )
     search_directory( path )
     
@@ -215,7 +217,9 @@ main :: proc()
   else // current directory
   {
     // search_directory( "C:\\Workspace\\odin\\term-tools" )
-    cwd := os.get_current_directory()
+    // cwd := os.get_current_directory()
+    cwd, err := os.get_working_directory( context.temp_allocator )
+    if err != os.ERROR_NONE { fmt.eprintln( "[ERROR] cant open CWD" ); return }
     // fmt.println( "cwd: ", cwd )
     search_directory( cwd )
   }
@@ -277,9 +281,9 @@ search_directory_recursive :: proc( name: string )
   }
 
   fis: []os.File_Info
-  defer os.file_info_slice_delete( fis ) // fis is a slice, we need to remember to free it
+  defer os.file_info_slice_delete( fis, context.allocator ) // fis is a slice, we need to remember to free it
 
-  fis, err = os.read_dir(f, -1) // -1 reads all file infos
+  fis, err = os.read_dir( f, -1, context.allocator ) // -1 reads all file infos
   if err != os.ERROR_NONE 
   {
     fmt.eprintln( "[ERROR] could not read directory: ", name )
@@ -315,7 +319,7 @@ search_directory_recursive :: proc( name: string )
     }
     else { print_file_name( fi ) }
 
-    if fi.is_dir && subdir_depth < i32(SUBDIR_DEPTH_MAX)
+    if fi.type == os.File_Type.Directory && subdir_depth < i32(SUBDIR_DEPTH_MAX)
     {
       total_files -= 1
       total_dirs  += 1
@@ -326,7 +330,7 @@ search_directory_recursive :: proc( name: string )
       subdir_depth -= 1
       offset -= 2
     }
-    else if !ONLY_SHOW_DIRS && fi.is_dir && subdir_depth > 1 &&
+    else if !ONLY_SHOW_DIRS && fi.type == os.File_Type.Directory && subdir_depth > 1 &&
             subdir_depth >= i32(SUBDIR_DEPTH_MAX)
     {
       tmp := LINE_ACT
@@ -344,7 +348,7 @@ search_directory_recursive :: proc( name: string )
 
 print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: bool = false, name_override: bool = false, new_name: string = "" )
 {
-  if ONLY_SHOW_DIRS && !fi.is_dir { return }
+  if ONLY_SHOW_DIRS && fi.type != os.File_Type.Directory { return }
 
   char_count := 0
 
@@ -353,13 +357,13 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
   {
     if !hide_icon
     {
-      if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+      if fi.type == os.File_Type.Directory { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
       else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON ); char_count += 3 }
       // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
     }
     else
     {
-      if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+      if fi.type == os.File_Type.Directory { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
       else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
     }
   }
@@ -374,13 +378,13 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
       // else         { fmt.printf( "%s %s",  LINE_ACT,  hide_icon ? "" : FILE_ICON ); char_count += 3 }
       if !hide_icon
       {
-        if fi.is_dir { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
+        if fi.type == os.File_Type.Directory { fmt.printf( "%s %s ", DIR_ENTER, DIR_ICON ); char_count += 3 }
         else         { fmt.printf( "%s %s ",  LINE_ACT,  FILE_ICON); char_count += 3 }
         // else         { fmt.printf( "%s %s",  LINE_ACT,  FILE_ICON); char_count += 3 }
       }
       else
       {
-        if fi.is_dir { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
+        if fi.type == os.File_Type.Directory { fmt.printf( "%s ", DIR_ENTER ); char_count += 1 }
         else         { fmt.printf( "%s ", LINE_ACT  ); char_count += 1 }
       }
     }
@@ -406,7 +410,7 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
     }
     else { fmt.printf( fi.name ); char_count += len(fi.name) }
 
-    if fi.is_dir { fmt.printf( "\\" ); char_count += 1 }
+    if fi.type == os.File_Type.Directory { fmt.printf( "\\" ); char_count += 1 }
   }
 
   // fmt.printf( " % *d", 30 - char_count, fi.size ) 
@@ -414,7 +418,7 @@ print_file_name :: proc( fi: os.File_Info, hide_size: bool = false, hide_icon: b
   max_chars = MAX_LINE_WIDTH - char_count
   assert( max_chars >= 0 )
 
-  if !fi.is_dir && !hide_size
+  if fi.type != os.File_Type.Directory && !hide_size
   {
     // if      max_chars >= 3 { fmt.printf( "  " ); char_count += 2 }
     // else                   { fmt.printf( "XX" ); char_count += 1 }

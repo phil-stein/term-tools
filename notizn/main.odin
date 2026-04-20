@@ -23,7 +23,8 @@ Default_Console_Logger_Opts :: log.Options {
 create_console_logger :: proc(lowest := log.Level.Debug, opt := Default_Console_Logger_Opts, ident := "") -> log.Logger 
 {
 	data := new(log.File_Console_Logger_Data)
-	data.file_handle = os.INVALID_HANDLE
+	// data.file_handle = os.INVALID_HANDLE
+	data.file_handle = nil 
 	data.ident = ident
 	return log.Logger{file_console_logger_proc, data, lowest, opt}
 }
@@ -50,8 +51,9 @@ CYAN      :: ansi.CSI + ansi.FG_CYAN         + ansi.SGR
 @(private="file")
 file_console_logger_proc :: proc(logger_data: rawptr, level: log.Level, text: string, options: log.Options, location := #caller_location) {
 	data := cast(^log.File_Console_Logger_Data)logger_data
-	h: os.Handle = os.stdout if level <= log.Level.Error else os.stderr
-	if data.file_handle != os.INVALID_HANDLE 
+	h: ^os.File = os.stdout if level <= log.Level.Error else os.stderr
+	// if data.file_handle != os.INVALID_HANDLE 
+	if data.file_handle != nil 
   {
 		h = data.file_handle
 	}
@@ -73,7 +75,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: log.Level, text: st
 	if .Thread_Id in options {
 		// NOTE(Oskar): not using context.thread_id here since that could be
 		// incorrect when replacing context for a thread.
-		fmt.sbprintf(&buf, "[{}] ", os.current_thread_id())
+		fmt.sbprintf(&buf, "[{}] ", os.get_current_thread_id())
 	}
 
 	if data.ident != "" {
@@ -251,14 +253,17 @@ main :: proc()
   // specified directory 
   if len(os.args) > 1 
   { 
-    path := str.concatenate( { os.get_current_directory(), "\\", os.args[1] } )
+    cwd, err := os.get_working_directory( context.temp_allocator )
+    if err != os.ERROR_NONE { fmt.eprintln( "[ERROR] getting CWD" ); return }
+    path := str.concatenate( { cwd, "\\", os.args[1] } )
     fmt.println( "path: ", path )
     search_directory_recursive( path )
   }
   else // current directory
   {
     // search_directory( "C:\\Workspace\\odin\\term-tools" )
-    cwd := os.get_current_directory()
+    cwd, err := os.get_working_directory( context.temp_allocator )
+    if err != os.ERROR_NONE { fmt.eprintln( "[ERROR] getting CWD" ); return }
     fmt.println( "cwd: ", cwd )
     search_directory_recursive( cwd )
   }
@@ -277,9 +282,9 @@ search_directory_recursive :: proc( name: string )
   }
 
   fis: []os.File_Info
-  defer os.file_info_slice_delete( fis ) // fis is a slice, we need to remember to free it
+  defer os.file_info_slice_delete( fis, context.temp_allocator ) // fis is a slice, we need to remember to free it
 
-  fis, err = os.read_dir( f, -1 ) // -1 reads all file infos
+  fis, err = os.read_dir( f, -1, context.allocator ) // -1 reads all file infos
   if err != os.ERROR_NONE 
   {
     fmt.eprintln( "[ERROR] could not read directory: ", name )
@@ -315,7 +320,7 @@ search_directory_recursive :: proc( name: string )
     // }
     // else { print_file_name( fi ) }
 
-    if fi.is_dir && subdir_depth < i32(SUBDIR_DEPTH_MAX)
+    if fi.type == os.File_Type.Directory && subdir_depth < i32(SUBDIR_DEPTH_MAX)
     {
       total_files -= 1
       total_dirs  += 1
@@ -341,13 +346,13 @@ search_directory_recursive :: proc( name: string )
 
     // }
     
-    if !fi.is_dir { search_file( fi ) }
+    if fi.type != os.File_Type.Directory { search_file( fi ) }
   }
 }
 
 search_file :: proc( fi: os.File_Info )
 {
-  txt, err := os.read_entire_file_from_filename_or_err( fi.fullpath, context.allocator )
+  txt, err := os.read_entire_file_from_path( fi.fullpath, context.allocator )
   if err != os.ERROR_NONE { log.error( "file not found: ", err ) }
   defer delete( txt, context.allocator )
 
